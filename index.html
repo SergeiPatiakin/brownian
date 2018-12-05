@@ -1,0 +1,147 @@
+<html>
+  <head>
+  	<script>
+        const numParticles = 20;
+        const initRadius = 100;
+        const centerX = 300;
+        const centerY = 300;
+        let D = 0;
+        const k = 0.001;
+        const g = 0.1;
+        const rg = 30;
+        let lastTimestamp = null;
+        let particles = [];
+        function getRandomColor(){
+            const r = Math.floor(200 * Math.random()).toString(16);
+            const g = Math.floor(200 * Math.random()).toString(16);
+            const b = Math.floor(200 * Math.random()).toString(16);
+            return '#' + r + g + b;
+        }
+        function generateInitialParticles(){
+            for (let i = 0; i < numParticles; i++){
+                particles.push({
+                    x: centerX + initRadius * Math.cos(i * 2 * Math.PI / numParticles),
+                    y: centerX + initRadius * Math.sin(i * 2 * Math.PI / numParticles),
+                    r: 5,
+                    color: getRandomColor(),
+                });
+            }
+            console.log(particles);
+        }
+        function getForces(particles){
+            const potentialForces = particles.map(p => ({
+                Fx: -k * (p.x - centerX),
+                Fy: -k * (p.y - centerY),
+            }));
+            const interactionForces = particles.map((p1, i) => {
+                let Fx = 0;
+                let Fy = 0;
+                particles.forEach((p2, j) => {
+                    if (i == j) return;
+                    const d = Math.hypot((p2.x - p1.x), (p2.y - p1.y))
+                    const F = g * Math.exp(-d/rg);
+                    Fx += -F * (p2.x - p1.x) / d;
+                    Fy += -F * (p2.y - p1.y) / d;
+                });
+                return {Fx, Fy};
+            });
+            return particles.map((_, i) => ({
+                Fx: potentialForces[i].Fx + interactionForces[i].Fx,
+                Fy: potentialForces[i].Fy + interactionForces[i].Fy,
+            }))
+        }
+        function getGaussians(particles, D){
+            return particles.map(p => ({
+                Jx: Math.sqrt(D) * uniRandom(),
+                Jy: Math.sqrt(D) * uniRandom(),
+            }));
+        }
+        function uniRandom(){
+            return 3 * (Math.random() - 0.5)
+        }
+        function getDiffusivity(timestamp){
+            const remainder = timestamp % 60000;
+            return 0.10 * Math.exp(-(60000 - remainder)/60000 * 2);
+        }
+        function updateState(timestamp, dt){
+            D = getDiffusivity(timestamp);
+            forces = getForces(particles);
+            gaussians = getGaussians(particles, D);
+            particles.forEach((p, i) => {
+                const dx = forces[i].Fx * dt + gaussians[i].Jx * Math.sqrt(dt);
+                const dy = forces[i].Fy * dt + gaussians[i].Jy * Math.sqrt(dt);
+                p.x += dx;
+                p.y += dy;
+            });
+        }
+        function drawClock(ctx) {
+            const clockR = 30;
+            const clockTheta = 2 * Math.PI * (lastTimestamp % 60000) / 60000;
+            ctx.beginPath();
+            ctx.ellipse(500, 100, clockR, clockR, 0, 0, 2*Math.PI);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#000000';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(500,100);
+            ctx.lineTo(500 + clockR * Math.sin(clockTheta), 100 - clockR * Math.cos(clockTheta));
+            ctx.moveTo(500, 100 - clockR - 5);
+            ctx.lineTo(500, 100 - clockR + 10);
+            ctx.stroke();
+        }
+        function drawState(_dt) {
+            var canvas = document.getElementById('canvas');
+  			if (canvas.getContext) {
+			    var ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, 600, 600);
+                // draw clock
+                drawClock(ctx);
+                // draw stage
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, 100, 100, 0, 0, 2*Math.PI);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#eeeeee';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, 60, 60, 0, 0, 2*Math.PI);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#eeeeee';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, 30, 30, 0, 0, 2*Math.PI);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#eeeeee';
+                ctx.stroke();
+
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.fillStyle = p.color;
+                    ctx.ellipse(p.x, p.y, p.r, p.r, 0, 0, 2*Math.PI);
+                    ctx.fill();    
+                });
+            }
+        }
+        function refresh(timestamp){
+            if (lastTimestamp === null){
+                timeDelta = 0;
+            } else {
+                timeDelta = timestamp - lastTimestamp;
+            }
+            updateState(timestamp, timeDelta);
+            drawState(timeDelta);
+            window.requestAnimationFrame(refresh);
+            lastTimestamp = timestamp;
+        }
+        function init() {
+            generateInitialParticles()
+            window.requestAnimationFrame(refresh);
+        }
+    </script>
+</head>
+<body onload='init()'>
+    <canvas height=600 width=600 id='canvas' />
+</body>
+</html>
